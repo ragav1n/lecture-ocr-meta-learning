@@ -1,0 +1,10 @@
+{
+  "total_samples": 4286,
+  "n_german_writers": 181,
+  "n_german_forms": 487,
+  "splits": {
+    "train": 3000,
+    "val": 642,
+    "test": 642
+  }
+}

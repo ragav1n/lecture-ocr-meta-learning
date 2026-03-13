@@ -1,0 +1,24 @@
+{
+  "splits": {
+    "train": {
+      "n_processed": 5000,
+      "n_skipped": 0,
+      "n_boxes": 58196
+    },
+    "val": {
+      "n_processed": 5000,
+      "n_skipped": 0,
+      "n_boxes": 66978
+    },
+    "test": {
+      "n_processed": 4723,
+      "n_skipped": 0,
+      "n_boxes": 53243
+    }
+  },
+  "class_names": [
+    "text",
+    "math"
+  ],
+  "max_images_per_split": 5000
+}
