@@ -372,4 +372,71 @@ Phase 2 model files written. YOLOv8 training resumed from epoch 20 (best mAP50=7
 
 7. **Download CROHME data** properly for math OCR training (see CROHME section above)
 
-*Last updated: 2026-03-13 — Phase 1 complete, Phase 2 scripts complete, YOLOv8 training in progress (epoch 20/100, mAP50=77.4%)*
+---
+
+## 🗓️ Log Entry — 2026-03-13 (GitHub Push + Germany Handoff)
+
+### GitHub Repository
+- **URL**: https://github.com/ragav1n/lecture-ocr-meta-learning
+- **Branch**: main
+- **Remote**: git@github.com:ragav1n/lecture-ocr-meta-learning.git (SSH)
+- **TAMER**: added as git submodule (https://github.com/qingzhenduyu/TAMER.git)
+- **Initial commit**: All code, configs, and JSON manifests (no images/weights)
+- **NOT in repo** (gitignored): data images, .pt/.ckpt weights, runs/, venv/
+
+### Training Status at Handoff
+**YOLOv8 Detection (baseline_v1_r2)**:
+- Epoch 2 of resumed run: mAP50=**82.2%** (epoch 1: 75.9%, epoch 2: 82.2%)
+- Resuming from original run epoch 20 (best was 77.4% at epoch 18)
+- Training path: `runs/detect/runs/detect/baseline_v1_r2/`
+- Check progress: `tail -f runs/detect/runs/detect/baseline_v1_r2/results.csv`
+- Best weights: `runs/detect/runs/detect/baseline_v1_r2/weights/best.pt`
+
+### Germany Handoff Checklist
+
+When continuing from Germany (new machine or same machine):
+
+#### 1. Clone repository
+```bash
+git clone git@github.com:ragav1n/lecture-ocr-meta-learning.git ocr_slide
+cd ocr_slide
+git submodule update --init --recursive   # restores TAMER/
+```
+
+#### 2. Restore Python environment
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements_project.txt
+pip install ultralytics learn2learn
+```
+
+#### 3. Restore data (from backup/local disk)
+The gitignored items you need:
+- `data/processed/detection/images/` — 14,723 images (~5GB) → re-run `python scripts/prepare_doclaynet.py` from DocLayNet_core.zip
+- `data/processed/german_text/images/` — IAM line images → re-run `python scripts/prepare_iam_german.py`
+- `runs/detect/` — trained detector weights → bring from original machine or retrain
+
+#### 4. Resume from where we left off
+In priority order:
+1. Wait for YOLOv8 training to finish (or check `baseline_v1_r2/weights/best.pt` if already done)
+2. Evaluate detector: `python evaluate/eval_detection.py --model runs/detect/runs/detect/baseline_v1_r2/weights/best.pt --data data/processed/detection/dataset.yaml`
+3. Fine-tune German TrOCR: `python training/finetune_german_ocr.py --epochs 30 --batch 8`
+4. Meta-learning: `python training/train_meta_learning.py --base-model checkpoints/trocr_german/best --epochs 50`
+
+#### 5. Context for new Claude session
+- All context is in this CLAUDE.md file
+- Memory directory: `/home/user/.claude/projects/[project-path]/memory/`
+- Say: "Read CLAUDE.md and continue from Germany handoff section"
+
+### Known Issues at Handoff
+
+| Issue | Status | Action |
+|-------|--------|--------|
+| CROHME zip is HTML page | ⚠️ Open | Download from https://www.cs.rit.edu/~crohme2019 or use TAMER version_3 directly |
+| pix2tex not installed | ⚠️ Minor | `pip install pix2tex` (not needed until Phase 2 baseline) |
+| learn2learn not installed | ⚠️ Minor | `pip install learn2learn` (needed for Phase 3) |
+| Professor slides ready? | ⛔ STOP | Ask user before processing Dr_Judith_Jakob_Slides/ |
+| YOLOv8 double-nested path | ℹ️ Known | Runs save to `runs/detect/runs/detect/` — use nested path everywhere |
+
+*Last updated: 2026-03-13 — Code on GitHub, YOLOv8 training epoch 2 mAP50=82.2%, ready for Germany handoff*
