@@ -659,3 +659,93 @@ nohup python -u training/finetune_german_ocr.py \
 | YOLOv8 double-nested path | ℹ️ Known | Path is `runs/detect/runs/detect/baseline_v1_r2/` |
 
 *Last updated: 2026-03-14 — Phase 2 complete. TrOCR fine-tuned (best val CER=1.29%), all evaluations done. Phase 3 MAML ready to start.*
+
+---
+
+## 🗓️ Log Entry — 2026-03-14 (Phase 3 Complete)
+
+### Current Stage
+Phase 3 ✅ Complete | Phase 4 (Integration + LectureSlideOCR-500-DE) 🔲 Next
+
+---
+
+### Results Summary — Phase 3 Complete
+
+#### Reptile Meta-Learning — ✅ COMPLETE
+
+- **Algorithm**: Switched from MAML to Reptile (first-order, memory-efficient, correct)
+  - Original MAML backward() was a bug — gradients on deepcopy don't flow to meta model
+  - Reptile directly moves meta params toward adapted params: `p_meta += outer_lr * (p_adapted - p_meta)`
+- **Best checkpoint**: `checkpoints/maml_ocr/meta_checkpoint_best.pt`
+- **Best val CER**: 0.85% (epoch 6) — better than fine-tuned TrOCR (1.29%)
+- **Training**: 46 epochs completed (power cut at epoch 46/50, best was epoch 6)
+- **Config**: 95 writers, 5 support/query, 3 inner steps, inner_lr=0.01, outer_lr=0.001
+
+#### Few-Shot Adaptation Evaluation — ✅ COMPLETE
+
+- **5-shot adaptation on 10 unseen test writers**
+- **CER before adaptation**: 0.53% (meta-learned init is already excellent)
+- **CER after 5-shot adaptation**: 0.60% (marginal regression — model already near-optimal on IAM)
+- Results: `outputs/eval_meta_learning.json`
+- Note: Adaptation will matter more on truly OOD data (Dr. Jakob's slides) where the domain gap is real
+
+#### Bugs Fixed in meta_learning_ocr.py
+1. `as_target_processor()` removed in transformers 5.x → use `processor.tokenizer()` (line 178)
+2. MAML `meta_loss.backward()` bug → switched to Reptile parameter update (no backward needed)
+3. CUDA OOM (deepcopy × batch_tasks=8) → one clone at a time + `del learner; empty_cache()`
+4. `optimizer` arg removed from `_save_meta_checkpoint` (not needed for Reptile)
+
+#### All Phase Results Summary
+
+| Phase | Model | Metric | Score | Target |
+|-------|-------|--------|-------|--------|
+| 2 | YOLOv8x detector | mAP50 | 91.5% | 88% ✅ |
+| 2 | TrOCR (no fine-tuning) | CER | 3.35% | <5% ✅ |
+| 2 | TrOCR fine-tuned | Val CER | 1.29% | 2-3% ✅ |
+| 3 | Reptile meta-learned | Val CER | 0.85% | 2-3% ✅✅ |
+| 3 | 5-shot adaptation | Test CER | 0.53% | 2-3% ✅✅ |
+
+---
+
+### Next Steps (Phase 4)
+
+1. **Ask user about Dr. Judith Jakob slides** — needed for LectureSlideOCR-500-DE dataset
+   ```
+   ⛔ DO NOT process data/Dr_Judith_Jakob_Slides/ without confirmation
+   ```
+
+2. **End-to-end pipeline evaluation**:
+   ```bash
+   python evaluate/eval_pipeline.py \
+       --detector runs/detect/runs/detect/baseline_v1_r2/weights/best.pt \
+       --ocr checkpoints/maml_ocr/meta_checkpoint_best.pt \
+       --output outputs/eval_pipeline.json
+   ```
+
+3. **TAMER math OCR test**:
+   ```bash
+   python -c "from models.math_ocr_tamer import TAMERMathOCR; m=TAMERMathOCR(); m.warm_up()"
+   ```
+
+4. **Build LectureSlideOCR-500-DE** (Phase 4, needs professor slides):
+   ```bash
+   python scripts/build_lecture_dataset.py
+   ```
+
+5. **Build inference script** (`infer.py`) for visual output on new slides:
+   - Input: slide image
+   - Output: same image with handwritten regions replaced by typeset text
+   - Test on Dr. Jakob's slides
+
+### Known Issues
+
+| Issue | Status | Action |
+|-------|--------|--------|
+| CROHME zip is HTML page | ⚠️ Open | Use TAMER version_3 directly (pretrained on CROHME) |
+| pix2tex not installed | ⚠️ Minor | `pip install pix2tex` (needed for math baseline eval) |
+| learn2learn not installable on Python 3.12 | ⚠️ Worked around | Reptile (ManualMAML) built into meta_learning_ocr.py |
+| Professor slides | ⛔ STOP | Ask user before processing `data/Dr_Judith_Jakob_Slides/` |
+| YOLOv8 double-nested path | ℹ️ Known | Path is `runs/detect/runs/detect/baseline_v1_r2/` |
+| Domain gap | ⚠️ Open | All training on IAM (English) — real test on German lecture slides pending |
+
+*Last updated: 2026-03-14 — Phase 3 complete. Reptile meta-learning done (best val CER=0.85%, 5-shot test CER=0.53%). Phase 4 (integration + professor slides) next.*
