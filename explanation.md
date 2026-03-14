@@ -258,13 +258,14 @@ Replace baseline components with better ones, fine-tune on domain data.
 - **TAMER** for math OCR (target: ExpRate ≥ 70%)
 - Scripts written, training queue: YOLOv8 → TrOCR fine-tune → evaluation
 
-### Phase 3 — Meta-Learning 🟡 Scripts Ready
+### Phase 3 — Meta-Learning ✅ Complete
 Add professor-specific adaptation.
 
-- MAML wrapper around fine-tuned TrOCR
-- Meta-train on IAM German writer tasks
-- Evaluate 5-shot adaptation on held-out writers
-- Target: CER ≤ 3% after adaptation
+- **Reptile** meta-learning (switched from MAML — MAML backward was buggy with deepcopy)
+- Meta-trained on 95 IAM German writer tasks
+- Best val CER: **0.85%** (better than fine-tuned TrOCR at 1.29%)
+- 5-shot adaptation on unseen writers: **CER = 0.53%**
+- Best checkpoint: `checkpoints/maml_ocr/meta_checkpoint_best.pt`
 
 ### Phase 4 — LectureSlideOCR-500-DE Dataset 🔲 Planned
 Build our own benchmark dataset for evaluation and publication.
@@ -301,15 +302,14 @@ Best model checkpoints:
 - Detector: `runs/detect/runs/detect/baseline_v1_r2/weights/best.pt`
 - OCR: `checkpoints/trocr_german/best/`
 
-### Phase 3 🟡 Ready to Start
-MAML meta-training is next. The script is ready at `training/train_meta_learning.py`.
-Uses a built-in ManualMAML fallback (learn2learn can't install on Python 3.12).
+### Phase 3 ✅ Complete
 
-```bash
-python -u training/train_meta_learning.py \
-    --base-model checkpoints/trocr_german/best \
-    --epochs 50 --tasks-per-epoch 100 --device cuda
-```
+| Model | Result | Target |
+|-------|--------|--------|
+| Reptile meta-learned (val) | CER = **0.85%** | 2-3% |
+| 5-shot adaptation (test) | CER = **0.53%** | 2-3% |
+
+Best checkpoint: `checkpoints/maml_ocr/meta_checkpoint_best.pt`
 
 ### Phases 4 & 5 🔲 Planned
 - Build LectureSlideOCR-500-DE dataset (requires professor slides — ask user first)
