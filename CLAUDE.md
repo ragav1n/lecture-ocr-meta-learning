@@ -559,3 +559,103 @@ nohup python training/finetune_german_ocr.py \
 Say: **"Read CLAUDE.md and continue from the Germany handoff section"**
 
 *Last updated: 2026-03-14 — YOLOv8 done (mAP50=91.5%), TrOCR baseline CER=3.35%, TrOCR fine-tuning running*
+
+---
+
+## 🗓️ Log Entry — 2026-03-14 (Phase 2 Complete, Phase 3 Ready)
+
+### Current Stage
+Phase 2 ✅ Complete | Phase 3 (MAML meta-learning) 🟡 Ready to start
+
+---
+
+### Results Summary — Phase 2 Complete
+
+#### TrOCR Fine-tuning — ✅ COMPLETE
+
+- **Best checkpoint**: `checkpoints/trocr_german/best/` (HuggingFace format)
+- **Best val CER**: 1.29% (epoch 1) — exceeded the 2-3% target
+- Trained for 8 epochs before early-stopping (overfitting after epoch 1)
+- **Test CER: 3.48%** — slightly above val CER, expected on unseen test split
+- Full results: `outputs/eval_german_ocr_finetuned.json`
+
+**Bugs fixed during fine-tuning**:
+1. `as_target_processor()` removed in transformers 5.x → use `processor.tokenizer()` directly (line 119)
+2. CUDA OOM with batch=8 → batch=4, grad-accum=8 (same effective batch of 32)
+3. `num_workers=4` crashes silently in WSL2 → set to 0 via `--workers 0`
+4. Generation config params in `model.config` rejected in transformers 5.x → moved to `model.generation_config`
+
+**Correct restart command** (for reference):
+```bash
+source venv/bin/activate
+nohup python -u training/finetune_german_ocr.py \
+    --train-data data/processed/german_text/german_text_train.json \
+    --val-data data/processed/german_text/german_text_val.json \
+    --output-dir checkpoints/trocr_german \
+    --epochs 30 --batch 4 --grad-accum 8 --workers 0 --device cuda \
+    > logs/trocr_finetune.log 2>&1 &
+```
+
+#### All Phase 2 Results
+
+| Model | Metric | Score | Target | Status |
+|-------|--------|-------|--------|--------|
+| YOLOv8x | mAP50 | 91.5% | 88% | ✅ |
+| YOLOv8x | mAP50-95 | 72.7% | — | ✅ |
+| TrOCR (baseline) | CER | 3.35% | <5% | ✅ |
+| TrOCR (fine-tuned) | Val CER | 1.29% | 2-3% | ✅ |
+| TrOCR (fine-tuned) | Test CER | 3.48% | — | ✅ |
+
+---
+
+### learn2learn — Not Installable on Python 3.12
+
+`learn2learn` uses Cython extensions that reference `longintrepr.h`, which was removed in Python 3.12. The package fails to build.
+
+**Solution**: `training/train_meta_learning.py` and `models/meta_learning_ocr.py` already include a `ManualMAML` fallback that implements MAML from scratch using PyTorch, no learn2learn required.
+
+---
+
+### Next Steps (Phase 3)
+
+1. **Start MAML meta-training** (uses ManualMAML fallback):
+   ```bash
+   source venv/bin/activate
+   nohup python -u training/train_meta_learning.py \
+       --base-model checkpoints/trocr_german/best \
+       --epochs 50 --tasks-per-epoch 100 --device cuda \
+       > logs/maml_training.log 2>&1 &
+   ```
+
+2. **Evaluate MAML few-shot adaptation** (after training):
+   ```bash
+   python evaluate/eval_german_ocr.py \
+       --model checkpoints/maml_ocr/best \
+       --data data/processed/german_text/german_text_test.json \
+       --output outputs/eval_maml_ocr.json
+   ```
+
+3. **TAMER math OCR test**:
+   ```bash
+   python -c "from models.math_ocr_tamer import TAMERMathOCR; m=TAMERMathOCR(); m.warm_up()"
+   ```
+
+4. **End-to-end pipeline evaluation** (Phase 4):
+   ```bash
+   python evaluate/eval_pipeline.py \
+       --detector runs/detect/runs/detect/baseline_v1_r2/weights/best.pt \
+       --ocr checkpoints/trocr_german/best \
+       --output outputs/eval_pipeline.json
+   ```
+
+### Known Issues
+
+| Issue | Status | Action |
+|-------|--------|--------|
+| CROHME zip is HTML page | ⚠️ Open | Use TAMER version_3 directly (pretrained on CROHME) |
+| pix2tex not installed | ⚠️ Minor | `pip install pix2tex` (needed for math baseline eval) |
+| learn2learn not installable on Python 3.12 | ⚠️ Worked around | ManualMAML fallback built into train_meta_learning.py |
+| Professor slides | ⛔ STOP | Ask user before processing `data/Dr_Judith_Jakob_Slides/` |
+| YOLOv8 double-nested path | ℹ️ Known | Path is `runs/detect/runs/detect/baseline_v1_r2/` |
+
+*Last updated: 2026-03-14 — Phase 2 complete. TrOCR fine-tuned (best val CER=1.29%), all evaluations done. Phase 3 MAML ready to start.*

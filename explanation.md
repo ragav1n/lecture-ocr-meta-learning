@@ -282,26 +282,39 @@ Build our own benchmark dataset for evaluation and publication.
 
 ---
 
-## Current Status (2026-03-13)
+## Current Status (2026-03-14)
 
-**What's happening right now**: YOLOv8 detector training in background.
-- Run: `runs/detect/runs/detect/baseline_v1_r2/`
-- Check progress: `tail -f runs/detect/runs/detect/baseline_v1_r2/results.csv`
-- At epoch ~24/100, mAP50 = 82.2% (target: 88%+)
+### Phase 1 ✅ Complete
+- All data prepared: IAM German (4,286 samples), DocLayNet (14,723 images, 178K boxes)
+- All baseline code written and tested
 
-**What's done**:
-- All data prepared (IAM German, DocLayNet)
-- All code written for Phase 1, 2, 3, and 4
-- Repository pushed to GitHub
+### Phase 2 ✅ Complete
 
-**What's next** (in order):
-1. Wait for YOLOv8 training to finish
-2. Evaluate detector (`evaluate/eval_detection.py`)
-3. Evaluate TrOCR baseline CER (before fine-tuning)
-4. Fine-tune TrOCR on German data (`training/finetune_german_ocr.py`)
-5. MAML meta-training (`training/train_meta_learning.py`)
-6. Build LectureSlideOCR-500-DE dataset (ask user first)
-7. Final evaluation and paper writing
+| Model | Result | Target |
+|-------|--------|--------|
+| YOLOv8x detector | mAP50 = **91.5%** | 88% |
+| TrOCR pretrained (baseline) | CER = **3.35%** | <5% |
+| TrOCR fine-tuned (best val) | CER = **1.29%** | 2-3% |
+| TrOCR fine-tuned (test) | CER = **3.48%** | — |
+
+Best model checkpoints:
+- Detector: `runs/detect/runs/detect/baseline_v1_r2/weights/best.pt`
+- OCR: `checkpoints/trocr_german/best/`
+
+### Phase 3 🟡 Ready to Start
+MAML meta-training is next. The script is ready at `training/train_meta_learning.py`.
+Uses a built-in ManualMAML fallback (learn2learn can't install on Python 3.12).
+
+```bash
+python -u training/train_meta_learning.py \
+    --base-model checkpoints/trocr_german/best \
+    --epochs 50 --tasks-per-epoch 100 --device cuda
+```
+
+### Phases 4 & 5 🔲 Planned
+- Build LectureSlideOCR-500-DE dataset (requires professor slides — ask user first)
+- End-to-end pipeline evaluation
+- Paper writing for ICDAR/CVPR 2026
 
 ---
 
