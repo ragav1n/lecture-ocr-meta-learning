@@ -440,3 +440,122 @@ In priority order:
 | YOLOv8 double-nested path | ℹ️ Known | Runs save to `runs/detect/runs/detect/` — use nested path everywhere |
 
 *Last updated: 2026-03-13 — Code on GitHub, YOLOv8 training epoch 2 mAP50=82.2%, ready for Germany handoff*
+
+---
+
+## 🗓️ Log Entry — 2026-03-14 (Phase 2 Evaluations Done, TrOCR Fine-tuning Running)
+
+### Current Stage
+Phase 2 — YOLOv8 ✅ Complete | TrOCR fine-tuning 🟡 Running | MAML 🔲 Waiting
+
+---
+
+### Results So Far
+
+#### YOLOv8 Detection — ✅ COMPLETE
+- **Training**: baseline_v1_r2, early stopped at epoch 85 (patience=20), best at epoch 66
+- **Best weights**: `runs/detect/runs/detect/baseline_v1_r2/weights/best.pt`
+
+| Metric | Score | Target | Status |
+|--------|-------|--------|--------|
+| mAP50 | **91.5%** | 88% | ✅ Exceeded |
+| mAP50-95 | 72.7% | — | ✅ Strong |
+| Precision | 89.3% | — | ✅ |
+| Recall | 88.4% | — | ✅ |
+| Text AP50 | 93.4% | — | ✅ |
+| Math AP50 | 89.7% | — | ✅ |
+
+Full results: `outputs/eval_detection_baseline.json`
+
+#### TrOCR Baseline (no fine-tuning) — ✅ EVALUATED
+- Model: `microsoft/trocr-large-handwritten` (pretrained, zero German fine-tuning)
+- **CER: 3.35%** — already below the 5% target without any fine-tuning!
+- **WER: 4.54%**
+- Note: IAM test set is English text by German writers. Real lecture slide handwriting may be harder.
+- Fine-tuning still necessary as base for MAML meta-learning.
+
+Full results: `outputs/eval_german_ocr_baseline.json`
+
+---
+
+### TrOCR Fine-tuning — 🟡 Running
+
+- **PID**: 12446 (started 2026-03-14 ~05:13)
+- **Script**: `training/finetune_german_ocr.py`
+- **Config**: 30 epochs, batch 8, AMP, gradient accumulation ×4, cosine LR, beam search n=4
+- **Log**: `logs/trocr_finetune.log`
+- **Results**: `checkpoints/trocr_german/training_log.json` (written per epoch)
+- **Best model**: `checkpoints/trocr_german/best/` (HuggingFace format)
+- **Expected duration**: 8-10 hours
+- **Expected CER**: 2-3% (down from 3.35% baseline)
+
+**Bug fixed**: `as_target_processor()` was removed in transformers 5.x. Fixed in `training/finetune_german_ocr.py` line 119 — now uses `self.processor.tokenizer()` directly.
+
+**Monitor**:
+```bash
+tail -f logs/trocr_finetune.log
+# or check per-epoch results:
+cat checkpoints/trocr_german/training_log.json
+```
+
+---
+
+### Germany Handoff — Updated Checklist
+
+#### What's done (don't redo these)
+- ✅ IAM German data prepared: `data/processed/german_text/`
+- ✅ DocLayNet detection data prepared: `data/processed/detection/`
+- ✅ YOLOv8 detector trained: `runs/detect/runs/detect/baseline_v1_r2/weights/best.pt`
+- ✅ Detector evaluated: mAP50=91.5% → `outputs/eval_detection_baseline.json`
+- ✅ TrOCR baseline evaluated: CER=3.35% → `outputs/eval_german_ocr_baseline.json`
+
+#### What's in progress
+- 🟡 TrOCR fine-tuning running on home machine (check if `checkpoints/trocr_german/best/` exists)
+
+#### When you arrive in Germany
+
+**If TrOCR fine-tuning completed** (check `checkpoints/trocr_german/training_log.json`):
+```bash
+# 1. Evaluate fine-tuned TrOCR
+python evaluate/eval_german_ocr.py \
+    --model checkpoints/trocr_german/best \
+    --data data/processed/german_text/german_text_test.json \
+    --output outputs/eval_german_ocr_finetuned.json
+
+# 2. Test TAMER math OCR integration
+python -c "from models.math_ocr_tamer import TAMERMathOCR; m=TAMERMathOCR(); m.warm_up()"
+
+# 3. Start MAML meta-training (Phase 3)
+python training/train_meta_learning.py \
+    --base-model checkpoints/trocr_german/best \
+    --epochs 50 --tasks-per-epoch 100 --device cuda
+```
+
+**If TrOCR fine-tuning still running** (process died during travel):
+```bash
+# Check if it crashed
+cat logs/trocr_finetune.log | tail -20
+
+# If crashed, restart (bug already fixed in the code)
+source venv/bin/activate
+nohup python training/finetune_german_ocr.py \
+    --train-data data/processed/german_text/german_text_train.json \
+    --val-data data/processed/german_text/german_text_val.json \
+    --output-dir checkpoints/trocr_german \
+    --epochs 30 --batch 8 --device cuda > logs/trocr_finetune.log 2>&1 &
+```
+
+#### Known Issues
+
+| Issue | Status | Action |
+|-------|--------|--------|
+| CROHME zip is HTML page | ⚠️ Open | Use TAMER version_3 directly (pretrained on CROHME) |
+| pix2tex not installed | ⚠️ Minor | `pip install pix2tex` (needed for math baseline eval) |
+| learn2learn not installed | ⚠️ Minor | `pip install learn2learn` (needed for Phase 3 MAML) |
+| Professor slides | ⛔ STOP | Ask user before processing `data/Dr_Judith_Jakob_Slides/` |
+| YOLOv8 double-nested path | ℹ️ Known | Path is `runs/detect/runs/detect/baseline_v1_r2/` |
+
+#### Context for new Claude session
+Say: **"Read CLAUDE.md and continue from the Germany handoff section"**
+
+*Last updated: 2026-03-14 — YOLOv8 done (mAP50=91.5%), TrOCR baseline CER=3.35%, TrOCR fine-tuning running*
